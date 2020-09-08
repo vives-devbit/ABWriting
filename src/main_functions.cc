@@ -24,6 +24,11 @@ limitations under the License.
 #include "model.h"
 #include "output_handler.h"
 
+#include "mbed.h"
+#include "stdlib.h"
+
+PwmOut led(LED1);
+
 // Globals, used for compatibility with Arduino-style sketches.
 namespace {
 tflite::ErrorReporter* error_reporter = nullptr;
@@ -109,6 +114,7 @@ void loop() {
 
   // Read the predicted y value from the model's output tensor
   float y_val = output->data.f[0];
+  led = abs(y_val);
 
   // Output the results. A custom HandleOutput function can be implemented
   // for each supported hardware target.
