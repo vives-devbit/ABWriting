@@ -13,7 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "tensorflow/lite/micro/examples/hello_world/constants.h"
+#include "output_handler.h"
 
-// This is a small number so that it's easy to read the logs
-const int kInferencesPerCycle = 20;
+void HandleOutput(tflite::ErrorReporter* error_reporter, float x_value,
+                  float y_value) {
+  // Log the current X and Y values
+  TF_LITE_REPORT_ERROR(error_reporter, "x_value: %f, y_value: %f\n",
+                       static_cast<double>(x_value),
+                       static_cast<double>(y_value));
+}

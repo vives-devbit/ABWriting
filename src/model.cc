@@ -22,7 +22,7 @@ limitations under the License.
 
 // See train/README.md for a full description of the creation process.
 
-#include "tensorflow/lite/micro/examples/hello_world/model.h"
+#include "model.h"
 
 // Keep model aligned to 8 bytes to guarantee aligned 64-bit accesses.
 alignas(8) const unsigned char g_model[] = {
