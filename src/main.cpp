@@ -38,7 +38,7 @@ const float kXrange = 2.f * 3.14159265359f;
 // inference, this value should be defined per-device.
 const int kInferencesPerCycle = 100;
 
-PwmOut led(LED1);
+DigitalOut led((PinName)0x6C);
 
 // Globals, used for compatibility with Arduino-style sketches.
 namespace {
@@ -125,7 +125,7 @@ void loop() {
 
   // Read the predicted y value from the model's output tensor
   float y_val = output->data.f[0];
-  led = abs(y_val);
+  led = y_val>=0;
 
   // Output the results.
   // Log the current X and Y values
