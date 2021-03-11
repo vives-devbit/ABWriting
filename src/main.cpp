@@ -13,17 +13,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "tensorflow/lite/micro/all_ops_resolver.h"
+// #include "tensorflow/lite/micro/all_ops_resolver.h"
 #include "tensorflow/lite/micro/micro_error_reporter.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "tensorflow/lite/version.h"
 
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "tensorflow/lite/micro/kernels/micro_ops.h"
+
 #include "model.h"
+// #include "accelerometer_handler.h"
 
 #include "mbed.h"
 #include "stdlib.h"
 
+#include "USBSerial.h"
+
+#define kChannelNumber 3
+
+USBSerial ser;
 
 // This constant represents the range of x values our model was trained on,
 // which is from 0 to (2 * Pi). We approximate Pi to avoid requiring additional
@@ -82,22 +91,16 @@ void setup() {
   // An easier approach is to just use the AllOpsResolver, but this will
   // incur some penalty in code space for op implementations that are not
   // needed by this graph.
-  static tflite::MicroMutableOpResolver<5> resolver;
-  micro_op_resolver.AddBuiltin(
-      tflite::BuiltinOperator_DEPTHWISE_CONV_2D,
-      tflite::ops::micro::Register_DEPTHWISE_CONV_2D());
-  micro_op_resolver.AddBuiltin(tflite::BuiltinOperator_MAX_POOL_2D,
-                               tflite::ops::micro::Register_MAX_POOL_2D());
-  micro_op_resolver.AddBuiltin(tflite::BuiltinOperator_CONV_2D,
-                               tflite::ops::micro::Register_CONV_2D());
-  micro_op_resolver.AddBuiltin(tflite::BuiltinOperator_FULLY_CONNECTED,
-                               tflite::ops::micro::Register_FULLY_CONNECTED());
-  micro_op_resolver.AddBuiltin(tflite::BuiltinOperator_SOFTMAX,
-                               tflite::ops::micro::Register_SOFTMAX());
+  static tflite::MicroMutableOpResolver<5> micro_op_resolver;
+  micro_op_resolver.AddDepthwiseConv2D();
+  micro_op_resolver.AddMaxPool2D();
+  micro_op_resolver.AddConv2D();
+  micro_op_resolver.AddFullyConnected();
+  micro_op_resolver.AddSoftmax();
 
   // Build an interpreter to run the model with.
   static tflite::MicroInterpreter static_interpreter(
-      model, resolver, tensor_arena, kTensorArenaSize, error_reporter);
+      model, micro_op_resolver, tensor_arena, kTensorArenaSize, error_reporter);
   interpreter = &static_interpreter;
 
   // Allocate memory from the tensor_arena for the model's tensors.
@@ -109,11 +112,11 @@ void setup() {
 
   // Obtain pointers to the model's input and output tensors.
     // Obtain pointer to the model's input tensor.
-  model_input = interpreter->input(0);
-  if ((model_input->dims->size != 4) || (model_input->dims->data[0] != 1) ||
-      (model_input->dims->data[1] != 128) ||
-      (model_input->dims->data[2] != kChannelNumber) ||
-      (model_input->type != kTfLiteFloat32)) {
+  input = interpreter->input(0);
+  if ((input->dims->size != 4) || (input->dims->data[0] != 1) ||
+      (input->dims->data[1] != 128) ||
+      (input->dims->data[2] != kChannelNumber) ||
+      (input->type != kTfLiteFloat32)) {
     TF_LITE_REPORT_ERROR(error_reporter,
                          "Bad input tensor parameters in model");
     return;
@@ -121,6 +124,13 @@ void setup() {
 
   // no output tensors in magicwand example
   // output = interpreter->output(0);
+
+  input_length = input->bytes / sizeof(float);
+
+  // TfLiteStatus setup_status = SetupAccelerometer(error_reporter);
+  // if (setup_status != kTfLiteOk) {
+  //   TF_LITE_REPORT_ERROR(error_reporter, "Set up failed\n");
+  // }
 
   // Keep track of how many inferences we have performed.
   inference_count = 0;
@@ -132,35 +142,53 @@ void loop() {
   // inference_count to the number of inferences per cycle to determine
   // our position within the range of possible x values the model was
   // trained on, and use this to calculate a value.
-  float position = static_cast<float>(inference_count) /
-                   static_cast<float>(kInferencesPerCycle);
-  float x_val = position * kXrange;
+  // float position = static_cast<float>(inference_count) /
+  //                  static_cast<float>(kInferencesPerCycle);
+  // float x_val = position * kXrange;
 
   // Place our calculated x value in the model's input tensor
-  input->data.f[0] = x_val;
+  // input->data.f[0] = x_val;
 
   // Run inference, and report any error
-  TfLiteStatus invoke_status = interpreter->Invoke();
-  if (invoke_status != kTfLiteOk) {
-    TF_LITE_REPORT_ERROR(error_reporter, "Invoke failed on x_val: %f\n",
-                         static_cast<double>(x_val));
-    return;
-  }
+  // TfLiteStatus invoke_status = interpreter->Invoke();
+  // if (invoke_status != kTfLiteOk) {
+  //   TF_LITE_REPORT_ERROR(error_reporter, "Invoke failed on x_val: %f\n",
+  //                        static_cast<double>(x_val));
+  //   return;
+  // }
 
   // Read the predicted y value from the model's output tensor
-  float y_val = output->data.f[0];
-  led = y_val>=0;
+  // float y_val = output->data.f[0];
+  // led = y_val>=0;
 
   // Output the results.
   // Log the current X and Y values
-  TF_LITE_REPORT_ERROR(error_reporter, "x_value: %f, y_value: %f\n",
-                       static_cast<double>(x_val),
-                       static_cast<double>(y_val));
+  // TF_LITE_REPORT_ERROR(error_reporter, "x_value: %f, y_value: %f\n",
+  //                      static_cast<double>(x_val),
+  //                      static_cast<double>(y_val));
 
+  // Attempt to read new data from the accelerometer.
+  // bool got_data =
+  //     ReadAccelerometer(error_reporter, input->data.f, input_length);
+  // If there was no new data, wait until next time.
+  // if (!got_data) return;
+
+  // Run inference, and report any error.
+  // TfLiteStatus invoke_status = interpreter->Invoke();
+  // if (invoke_status != kTfLiteOk) {
+  //   TF_LITE_REPORT_ERROR(error_reporter, "Invoke failed on index: %d\n",
+  //                        begin_index);
+  //   return;
+  // }
+  // Analyze the results to obtain a prediction
+  // int gesture_index = PredictGesture(interpreter->output(0)->data.f);
+
+  ser.printf("test\n\r");
   // Increment the inference_counter, and reset it if we have reached
   // the total number per cycle
   inference_count += 1;
-  if (inference_count >= kInferencesPerCycle) inference_count = 0;
+  ser.printf("inf_c: %d\n\r",inference_count);
+  // if (inference_count >= kInferencesPerCycle) inference_count = 0;
 }
 
 
